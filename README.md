@@ -81,7 +81,7 @@ cd Line-Following-Robot-EH
 
 ### 4. Build the Project
 
-Click the ✔️ (Build) button in the bottom toolbar.
+Click the Check mark in the bottom left (Build) button in the bottom toolbar. (May also be the checkmark button near the top right )
 
 ---
 
