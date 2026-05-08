@@ -104,6 +104,7 @@ We convert sensor values into a single "position value".
 */
 
 float simulateSensor() {
+
   static float t = 0;
   t += 0.1;
 
@@ -112,6 +113,96 @@ float simulateSensor() {
   float position = sin(t);
 
   return position;
+
+}
+
+/*
+-----------------------------------------------------------
+getPosition()
+-----------------------------------------------------------
+
+PURPOSE:
+This function determines where the black line is relative
+to the center of the robot.
+
+The output should be a SINGLE position value:
+
+-1.0  = line is far LEFT
+ 0.0  = robot is centered on line
++1.0  = line is far RIGHT
+
+This value becomes the input to the PID controller.
+
+-----------------------------------------------------------
+REAL HARDWARE VERSION (FUTURE)
+-----------------------------------------------------------
+
+Eventually this function will:
+
+1. Read multiple CNY70 IR sensors
+2. Detect which sensors see the black line
+3. Convert those readings into ONE weighted position
+
+Example sensor layout:
+
+[S1] [S2] [S3] [S4] [S5]
+ -1  -0.5  0  +0.5 +1
+
+Example:
+0 0 1 0 0  -> centered -> 0
+1 1 0 0 0  -> left     -> -0.75
+0 0 0 1 1  -> right    -> +0.75
+
+-----------------------------------------------------------
+WITHOUT HARDWARE (CURRENT TASK)
+-----------------------------------------------------------
+
+For now:
+- simulate sensor behavior
+- create fake sensor patterns
+- test weighted averaging logic
+
+IMPORTANT:
+The goal is NOT realism yet.
+The goal is to build the POSITION CALCULATION PIPELINE.
+
+-----------------------------------------------------------
+SUGGESTED IMPLEMENTATION STEPS
+-----------------------------------------------------------
+
+STEP 1:
+Create a fake sensor array:
+int sensors[5];
+
+STEP 2:
+Simulate different line positions
+(example patterns)
+
+STEP 3:
+Assign weights to each sensor:
+[-1, -0.5, 0, 0.5, 1]
+
+STEP 4:
+Compute weighted average position
+
+STEP 5:
+Return final normalized position value
+
+-----------------------------------------------------------
+EXPECTED OUTPUT:
+-----------------------------------------------------------
+
+float position
+
+Range:
+-1.0 to +1.0
+*/
+
+float getPosition() {
+
+  // TODO:
+  // Replace this with weighted sensor logic
+
 }
 
 
@@ -187,7 +278,7 @@ void setup() {
 void loop() {
 
   // STEP 1: SENSOR INPUT (CNY70 SIMULATION)
-  float position = simulateSensor();
+  float position = simulateSensor();   //TODO: Repace with getPosition when implemented
 
   // STEP 2: COMPUTE ERROR (center is 0)
   float target = 0;
