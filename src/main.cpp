@@ -167,6 +167,8 @@ void setMotors(float correction) {
 
 }
 
+/**
+ * Setup function - runs once at the beginning
 
 // -------------------------------------------------
 // 4. SETUP (RUNS ONCE)
@@ -179,10 +181,12 @@ void setup() {
   Serial.println(" LINE FOLLOWING ROBOT SIMULATION ");
   Serial.println("====================================\n");
 }
-
+ */
 
 // -------------------------------------------------
 // 5. MAIN LOOP (REAL ROBOT LOGIC FLOW)
+/**
+ * Main loop of the robot
 // -------------------------------------------------
 void loop() {
 
@@ -206,4 +210,16 @@ void loop() {
   setMotors(correction);
 
   delay(100);
+}
+*/
+
+void setup(){
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("Setup complete. Starting loop...");
+}
+
+void loop(){
+  Serial.println("running...");
+  delay(1000);
 }
