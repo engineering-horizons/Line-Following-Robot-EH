@@ -17,7 +17,7 @@ We are building a system that will later run on an ESP32
 with CNY70 IR sensors and motor drivers.
 
 ===========================================================
-SYSTEM OVERVIEW (VERY IMPORTANT)
+SYSTEM OVERVIEW 
 ===========================================================
 
 The robot follows this pipeline:
@@ -73,20 +73,53 @@ Each module is independent so teams can work in parallel.
 
 
 // -------------------- CONFIG --------------------
-float baseSpeed = 120;
+const float baseSpeed = 120;
+
+// -------------------- SENSOR --------------------
+const int sensorThreshold = 2000;
 
 // PID constants (starting point - we will tune these later)
-float Kp = 80;
-float Ki = 0;
-float Kd = 20;
+const float Kp = 80;
+const float Ki = 0;
+const float Kd = 20;
 
+
+// --------------- GLOBAL STATE ----------------
 // PID memory
 float integral = 0;
 float lastError = 0;
 
+int sensors[5];
+
+//---------------- HARDWARE PINS ----------------
+
+// TODO: Replace with actual PCB mappings
+const int sensorPins[5] = {34, 35, 32, 33, 25};
+
+// TB6612FNG
+///A and B are out two motors
+//PWM is the power amount we send 0 - 225
+// IN1 and IN2 control direction
+//Ex:
+//Example:
+/*
+  AIN1	AIN2	Result
+  HIGH	LOW	  forward
+  LOW	  HIGH	reverse
+  LOW	  LOW	  stop
+*/
+const int PWMA = 26;
+const int AIN1 = 27;
+const int AIN2 = 14;
+
+const int PWMB = 13;
+const int BIN1 = 12;
+const int BIN2 = 15;
+
+
 
 // -------------------------------------------------
-// 1. SENSOR LAYER (SIMULATED CNY70 ARRAY)
+// 1. SENSOR LAYER (READ/SIMULATE CN70 Array)
 // -------------------------------------------------
 /*
 REAL HARDWARE (CNY70 SETUP):
@@ -103,19 +136,36 @@ WHITE GROUND → high reflection
 We convert sensor values into a single "position value".
 */
 
-float simulateSensor() {
+void readSensors() {
 
-  static float t = 0;
-  t += 0.1;
+  // ======================================================
+  // TEMP SIMULATION MODE
+  // Replace with analogRead() when hardware is connected
+  // ======================================================
 
-  // Simulated robot movement over a line
-  // (-1 = far left, +1 = far right)
-  float position = sin(t);
+  float t = millis() / 1000.0;
 
-  return position;
+  sensors[0] = (sin(t) > 0.5) ? 1 : 0;
+  sensors[1] = (sin(t + 0.5) > 0.5) ? 1 : 0;
+  sensors[2] = (sin(t + 1.0) > 0.5) ? 1 : 0;
+  sensors[3] = (sin(t + 1.5) > 0.5) ? 1 : 0;
+  sensors[4] = (sin(t + 2.0) > 0.5) ? 1 : 0;
 
+  // ======================================================
+  // REAL ANALOG READ 
+  // ======================================================
+  // TODO: Determine experimentally using real sensor values
+  /*
+
+  int raw = analogRead(sensorPins[i]);
+
+  if (raw < sensorThreshold)
+      sensors[i] = 1;
+  else
+      sensors[i] = 0;
+
+  */
 }
-
 /*
 -----------------------------------------------------------
 getPosition()
@@ -201,22 +251,7 @@ Range:
 float getPosition() {
 
   // ======================================================
-  // STEP 1: SIMULATED SENSOR INPUT (DO NOT MODIFY)
-  // ======================================================
-
-  int sensors[5];
-
-  // Fake line movement (already working simulation)
-  float t = millis() / 1000.0;
-
-  sensors[0] = (sin(t) > 0.5) ? 1 : 0;
-  sensors[1] = (sin(t + 0.5) > 0.5) ? 1 : 0;
-  sensors[2] = (sin(t + 1.0) > 0.5) ? 1 : 0;
-  sensors[3] = (sin(t + 1.5) > 0.5) ? 1 : 0;
-  sensors[4] = (sin(t + 2.0) > 0.5) ? 1 : 0;
-
-  // ======================================================
-  // STEP 2: WEIGHTS (DO NOT CHANGE)
+  // STEP 1:WEIGHTS (DO NOT CHANGE)
   // ======================================================
 
   float weights[5] = {-1.0, -0.5, 0.0, 0.5, 1.0};
@@ -237,11 +272,27 @@ float getPosition() {
   float sum = 0;
   int activeCount = 0;
 
-  // TODO: implement weighted average here
+  // Loop through all sensors
+  for (int i = 0; i < 5; i++) {
+    if (sensors[i] == 1) {
+      sum += weights[i];
+      activeCount++;
+    }
+  }
+  if (activeCount == 0) {
+    return 0;
+  }
 
-  return 0; // <-- replace this
+  // Weighted average
+  float position = sum / activeCount;
+
+  // Debug print
+  Serial.print("POSITION: ");
+  Serial.println(position);
+
+  return position;
 }
-}
+
 
 
 // -------------------------------------------------
@@ -257,34 +308,33 @@ We want the robot centered → target = 0
 
 float computePID(float error) {
 
-  // ======================================================
-  // STEP 1 (START SIMPLE - REQUIRED FIRST)
-  // ======================================================
-  // GOAL:
-  // Make correction proportional to error ONLY
-  //
-  // SEARCH:
-  // "proportional control robot line following"
-  // ======================================================
+  // PROPORTIONAL TERM
+  //    - Bigger error = bigger steering correction
 
-  float correction = 0;
+  float proportional = Kp * error;
 
-  // TODO (STEP 1 ONLY):
-  // correction = Kp * error;
+  // DERIVATIVE TERM
+  //    -Helps reduce oscillation/shaking
 
-  // ======================================================
-  // STEP 2 (ONLY AFTER STEP 1 WORKS)
-  // OPTIONAL IMPROVEMENTS:
-  // Add stability using:
-  // - integral (Ki)
-  // - derivative (Kd)
-  //
-  // HINT:
-  // integral += error;
-  // derivative = error - lastError;
-  // ======================================================
+  float derivative = error - lastError;
+
+  // INTEGRAL TERM
+  //    - Helps correct long-term drift
+
+  integral += error;
+
+  // FINAL PID OUTPUT
+
+  float correction =
+      proportional +
+      (Ki * integral) +
+      (Kd * derivative);
+
+  // Save for next loop
+  lastError = error;
 
   return correction;
+
 }
 
 
@@ -308,8 +358,8 @@ void setMotors(float correction) {
   // Convert "correction" into LEFT + RIGHT motor speeds
   // ======================================================
 
-  float leftMotor = 0;
-  float rightMotor = 0;
+  float leftMotor = baseSpeed - correction;
+  float rightMotor = baseSpeed + correction;
 
   // ======================================================
   // STEP 1 (REQUIRED)
@@ -329,16 +379,37 @@ void setMotors(float correction) {
   // STEP 2 (SAFETY - DO NOT REMOVE)
   // ======================================================
 
+
   leftMotor = constrain(leftMotor, -255, 255);
   rightMotor = constrain(rightMotor, -255, 255);
 
-  // ======================================================
-  // DEBUG OUTPUT (KEEP THIS)
-  // ======================================================
+  // ---------------- LEFT MOTOR ----------------
+  if (leftMotor >= 0) {
+    digitalWrite(AIN1, HIGH);
+    digitalWrite(AIN2, LOW);
+  } else {
+    digitalWrite(AIN1, LOW);
+    digitalWrite(AIN2, HIGH);
+  }
 
-  Serial.print("LEFT: ");
+  // ---------------- RIGHT MOTOR ----------------
+  if (rightMotor >= 0) {
+    digitalWrite(BIN1, HIGH);
+    digitalWrite(BIN2, LOW);
+  } else {
+    digitalWrite(BIN1, LOW);
+    digitalWrite(BIN2, HIGH);
+  }
+
+  // PWM POWER
+  analogWrite(PWMA, abs(leftMotor));
+  analogWrite(PWMB, abs(rightMotor));
+
+  // DEBUG
+  Serial.print("L:");
   Serial.print(leftMotor);
-  Serial.print(" | RIGHT: ");
+
+  Serial.print(" | R:");
   Serial.println(rightMotor);
 }
 
@@ -349,6 +420,20 @@ void setMotors(float correction) {
 void setup() {
   Serial.begin(115200);
   delay(1000);
+
+  // ---------------- SENSOR PINS ----------------
+  for (int i = 0; i < 5; i++) {
+    pinMode(sensorPins[i], INPUT);
+  }
+
+  // ---------------- MOTOR DRIVER PINS ----------------
+  pinMode(PWMA, OUTPUT);
+  pinMode(AIN1, OUTPUT);
+  pinMode(AIN2, OUTPUT);
+
+  pinMode(PWMB, OUTPUT);
+  pinMode(BIN1, OUTPUT);
+  pinMode(BIN2, OUTPUT);
 
   Serial.println("\n====================================");
   Serial.println(" LINE FOLLOWING ROBOT SIMULATION ");
@@ -361,11 +446,26 @@ void setup() {
 // -------------------------------------------------
 float simulatedPosition = 0;  // fake robot state
 
-/*
+//for debugging
+void printSensors() {
+
+  Serial.print("SENSORS: ");
+
+  for (int i = 0; i < 5; i++) {
+    Serial.print(sensors[i]);
+    Serial.print(" ");
+  }
+
+  Serial.println();
+}
+
+
 void loop() {
 
+  readSensors();
+  printSensors();
   // 1. SENSOR (what robot THINKS is happening)
-  float sensorPosition = simulateSensor();
+  float sensorPosition = getPosition();
 
   // 2. ERROR
   float error = 0 - sensorPosition;
@@ -376,27 +476,63 @@ void loop() {
   // 4. MOTOR OUTPUT (this is what PID is controlling)
   setMotors(correction);
 
-  // This simulates how motors affect robot position
 
-  simulatedPosition += correction * 0.0005;
+  Serial.print("POS: ");
+  Serial.print(sensorPosition);
 
-  // natural drift (like real robot imbalance)
-  simulatedPosition *= 0.98;
+  Serial.print(" | ERR: ");
+  Serial.print(error);
 
-  // feed simulated position back into sensor model
-  Serial.print("SIM POS: ");
-  Serial.print(simulatedPosition);
   Serial.print(" | CORR: ");
-  Serial.println(correction);
+  Serial.print(correction);
+
+  delay(100);
+}
+
+
+
+// ======================================================
+// SENSOR READING TEST
+// ======================================================
+/*
+void loop() {
+
+  printRawSensorValues();
 
   delay(100);
 }
 */
+void printRawSensorValues() {
+
+  Serial.print("RAW: ");
+
+  for (int i = 0; i < 5; i++) {
+
+    int raw = analogRead(sensorPins[i]);
+
+    Serial.print(raw);
+    Serial.print(" ");
+  }
+
+  Serial.println();
+}
 
 
 
-//SETUP 
 
+// ======================================================
+// TEMP ESP32 CONNECTION TEST
+// ======================================================
+// This temporary setup/loop is ONLY for verifying:
+// - ESP32 uploads correctly
+// - Serial Monitor works
+// - PlatformIO connection works
+//
+// Once hardware integration begins:
+// - remove/comment this section
+// - restore main robot simulation loop
+// ======================================================
+/*
 void setup() {
   Serial.begin(115200);
   delay(1000);
@@ -408,3 +544,4 @@ void loop() {
   Serial.println("running...");
   delay(1000);
 }
+*/
